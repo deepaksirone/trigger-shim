@@ -40,7 +40,7 @@ connection = ''
 def send_response(handler, response_code: int, response_string: str):
     handler.send_response(response_code)
     handler.send_header('Content-type', 'application/json')
-    handler.send_header("Content-Length", str(len(response_string)))
+    handler.send_header("Content-Length", str(len(response_string.encode())))
     handler.end_headers()
     handler.wfile.write(response_string.encode())
 
@@ -59,7 +59,7 @@ def check_request_validity(body, request: str):
         tid = int(body['trigger_id'])
         if tid >= 32:
             return False
-        return len(body['key_trigger']) == KEY_LENGTH
+        return len(body['key_trigger']) == KEY_LENGTH * 2
     if request == 'event_data':
         for field in ['trigger_id', 'oauth_token', 'nonce']:
             if field not in body:
@@ -190,11 +190,17 @@ class HandleRequests(BaseHTTPRequestHandler):
             if len(result) == 0:
                 send_response(self, 400, json.dumps({"error": "Invalid Token"}))
                 return
+            
+            print(result)
+            key = binascii.unhexlify(result[0][3])
 
             cipher = AES.new(key, AES.MODE_GCM)
+            data = json.dumps({"data" : trigger_endpoint_data["trigger%s" % body['trigger_id']], "timestamp" : int(time.time()), "nonce" : body['nonce']})
+            ciphertext, tag = cipher.encrypt_and_digest(data.encode())
 
+            
             #TODO: Send ciphertext
-            send_response(self, 200, json.dumps({"data" : trigger_endpoint_data["trigger%s" % body['trigger_id']], "timestamp" : int(time.time())}))
+            send_response(self, 200, json.dumps({"event_ciphertext": binascii.hexlify(ciphertext).decode(), "tag": binascii.hexlify(tag).decode()}))
             return
 
             
