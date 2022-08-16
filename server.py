@@ -18,6 +18,7 @@ import sys
 import os
 from base64 import b64encode
 from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
 
 import sqlite3
 import bcrypt
@@ -25,7 +26,7 @@ import bcrypt
 current_dir_path = os.path.dirname(os.path.abspath(__file__))
 KEY_LENGTH = 32
 trigger_ids = ["trigger" + str(i) for i in range(32)]
-trigger_endpoint_data = {"trigger0" : "{ ConditionImageUrl: \"https://imageurl.com/image.jpg\" }"}
+trigger_endpoint_data = {"trigger0" : "{ \"ConditionImageUrl\": \"https://imageurl.com/image.jpg\" }"}
 server_salt = b'$2b$12$eGObDmmwNbOszD0FEEf83u'
 dbPath = ""
 self_ip = ''
@@ -61,7 +62,7 @@ def check_request_validity(body, request: str):
             return False
         return len(body['key_trigger']) == KEY_LENGTH * 2
     if request == 'event_data':
-        for field in ['trigger_id', 'oauth_token', 'nonce']:
+        for field in ['trigger_id', 'oauth_token', 'nonce', 'params']:
             if field not in body:
                 return False
         tid = int(body['trigger_id'])
@@ -108,6 +109,8 @@ class HandleRequests(BaseHTTPRequestHandler):
         content_len = int(self.headers.get('Content-Length'))
         post_body = self.rfile.read(content_len)
         decoded_body = post_body.decode()
+
+        print (decoded_body)
         body = json.loads(decoded_body)
 
         try:
@@ -194,13 +197,30 @@ class HandleRequests(BaseHTTPRequestHandler):
             print(result)
             key = binascii.unhexlify(result[0][3])
 
-            cipher = AES.new(key, AES.MODE_GCM)
-            data = json.dumps({"data" : trigger_endpoint_data["trigger%s" % body['trigger_id']], "timestamp" : int(time.time()), "nonce" : body['nonce']})
+            enc_nonce = get_random_bytes(16)
+            cipher = AES.new(key, AES.MODE_GCM, nonce=enc_nonce)
+            #print (body['params'])
+            try:
+                params = json.loads(body['params'])
+            except Exception as e:
+                message = "Internal server error: {}".format(e)
+                package = {"error": message}
+                response = json.dumps(package)
+
+                send_response(self, 500, response)
+            
+            base_resp = {"data" : trigger_endpoint_data["trigger%s" % body['trigger_id']], "timestamp" : int(time.time()), "nonce" : body['nonce']}
+            for param in params:
+                base_resp[param] = params[param]
+
+            print (base_resp)
+            data = json.dumps(base_resp)
+            
             ciphertext, tag = cipher.encrypt_and_digest(data.encode())
 
             
             #TODO: Send ciphertext
-            send_response(self, 200, json.dumps({"event_ciphertext": binascii.hexlify(ciphertext).decode(), "tag": binascii.hexlify(tag).decode()}))
+            send_response(self, 200, json.dumps({"event_ciphertext": binascii.hexlify(ciphertext).decode(), "tag": binascii.hexlify(tag).decode(), "enc_nonce": binascii.hexlify(enc_nonce).decode()}))
             return
 
             
