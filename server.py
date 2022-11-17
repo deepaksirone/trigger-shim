@@ -26,12 +26,15 @@ import bcrypt
 current_dir_path = os.path.dirname(os.path.abspath(__file__))
 KEY_LENGTH = 32
 trigger_ids = ["trigger" + str(i) for i in range(32)]
-trigger_endpoint_data = {"trigger0" : "{ \"ConditionImageUrl\": \"https://imageurl.com/image.jpg\" }"}
+#trigger_endpoint_data = {"trigger0" : "{ \"ConditionImageUrl\": \"https://imageurl.com/image.jpg\" }"}
+trigger_endpoint_data = {"trigger0" : "{\"AndroidPhone\":{\"placeAPhoneCall\":{\"CallLength\":\"123\",\"OccurredAt\":\"11-5-2022\"}}}"}
+
 server_salt = b'$2b$12$eGObDmmwNbOszD0FEEf83u'
 dbPath = ""
 self_ip = ''
 self_port = -1
 connection = ''
+encrypted = ""
 
 ## TODO:
 #POST methods:
@@ -110,7 +113,7 @@ class HandleRequests(BaseHTTPRequestHandler):
         post_body = self.rfile.read(content_len)
         decoded_body = post_body.decode()
 
-        print (decoded_body)
+        #print (decoded_body)
         body = json.loads(decoded_body)
 
         try:
@@ -194,7 +197,7 @@ class HandleRequests(BaseHTTPRequestHandler):
                 send_response(self, 400, json.dumps({"error": "Invalid Token"}))
                 return
             
-            print(result)
+            #print(result)
             key = binascii.unhexlify(result[0][3])
 
             enc_nonce = get_random_bytes(16)
@@ -213,14 +216,16 @@ class HandleRequests(BaseHTTPRequestHandler):
             for param in params:
                 base_resp[param] = params[param]
 
-            print (base_resp)
+            #print (base_resp)
             data = json.dumps(base_resp)
-            
-            ciphertext, tag = cipher.encrypt_and_digest(data.encode())
+            if (encrypted == "--encrypted"):
+                ciphertext, tag = cipher.encrypt_and_digest(data.encode())
 
             
             #TODO: Send ciphertext
-            send_response(self, 200, json.dumps({"event_ciphertext": binascii.hexlify(ciphertext).decode(), "tag": binascii.hexlify(tag).decode(), "enc_nonce": binascii.hexlify(enc_nonce).decode()}))
+                send_response(self, 200, json.dumps({"event_ciphertext": binascii.hexlify(ciphertext).decode(), "tag": binascii.hexlify(tag).decode(), "enc_nonce": binascii.hexlify(enc_nonce).decode()}))
+            else:
+                send_response(self, 200, data)
             return
 
             
@@ -242,12 +247,16 @@ class Server(ThreadingMixIn, HTTPServer):
         global self_ip
         global self_port
         global trigger_ids
+        global encrypted
         global connection
 
         dbName = 'triggers.db'
         dbPath = os.path.join(current_dir_path, dbName)
         self_ip = str(sys.argv[1])
         self_port = str(sys.argv[2])
+        if len(sys.argv) == 4:
+            print ("Running in encrypted mode")
+            encrypted = sys.argv[3]
 
         connection = sqlite3.connect(dbPath, detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
         cursor = connection.cursor()
