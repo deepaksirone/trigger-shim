@@ -27,7 +27,7 @@ current_dir_path = os.path.dirname(os.path.abspath(__file__))
 KEY_LENGTH = 32
 trigger_ids = ["trigger" + str(i) for i in range(32)]
 #trigger_endpoint_data = {"trigger0" : "{ \"ConditionImageUrl\": \"https://imageurl.com/image.jpg\" }"}
-trigger_endpoint_data = {"trigger0" : "{\"AndroidPhone\":{\"placeAPhoneCall\":{\"CallLength\":\"123\",\"OccurredAt\":\"11-5-2022\"}}}"}
+trigger_endpoint_data = {"trigger0" : "{\"ConditionImageUrl\": \"https://imageurl.com/image.jpg\", \"Moisture\": \"35\", \"EventTitle\": \"Holidays away\", \"LinkToProfile\": \"https://www.twitter.com/NDSSSymposium\", \"Text\": \"RT @NDSSSyposium Hello\"}"}
 
 server_salt = b'$2b$12$eGObDmmwNbOszD0FEEf83u'
 dbPath = ""
